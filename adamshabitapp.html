@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adam's Habits | High Performance Tracker</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        },
+                        hp: {
+                            gold: '#fbbf24',
+                            accent: '#3b82f6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #020617; /* Slate 950 */
+            color: #e2e8f0; /* Slate 200 */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569; 
+        }
+
+        /* Range Input Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            margin-top: -8px; 
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Tab Transitions */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Water Drop Animation */
+        .water-drop {
+            transition: all 0.2s ease;
+        }
+        .water-drop:hover {
+            transform: scale(1.1);
+        }
+        .water-drop.filled {
+            color: #3b82f6;
+            text-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+        }
+        .water-drop.empty {
+            color: #334155;
+        }
+
+        .food-card {
+            transition: transform 0.2s;
+        }
+        .food-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen pb-20">
+
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-hp-accent p-2 rounded-lg">
+                        <i class="fa-solid fa-bolt text-white"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight text-white">Adam's Habits</span>
+                </div>
+                <div class="flex space-x-2 bg-slate-800 p-1 rounded-lg">
+                    <button onclick="switchTab('journal')" id="tab-journal" class="px-4 py-2 rounded-md text-sm font-medium transition-colors bg-slate-700 text-white shadow">Journal</button>
+                    <button onclick="switchTab('trends')" id="tab-trends" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-colors">History</button>
+                    <button onclick="switchTab('nutrition')" id="tab-nutrition" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-colors">Nutrition</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sticky Progress Bar (Journal Only) -->
+    <div id="sticky-progress-container" class="sticky top-16 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md transition-all duration-300">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
+            <span class="text-xs font-bold text-slate-400 uppercase whitespace-nowrap hidden sm:block">Day Progress</span>
+            <div class="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden relative border border-slate-700">
+                <div id="global-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <span id="global-progress-text" class="text-xs font-mono font-bold text-white w-12 text-right">0%</span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+
+        <!-- ==================== JOURNAL TAB ==================== -->
+        <div id="content-journal" class="tab-content active space-y-8">
+            
+            <!-- Date Display -->
+            <div class="text-center">
+                <h2 class="text-3xl font-bold text-white mb-1" id="currentDateDisplay">Today</h2>
+                <p class="text-slate-400 text-sm uppercase tracking-wider font-semibold">Make it Count</p>
+            </div>
+
+            <!-- PART 1: Morning Mindset -->
+            <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                    <i class="fa-solid fa-sun text-yellow-500 text-xl"></i>
+                    <h3 class="text-xl font-bold text-white">Morning Mindset</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">1. One thing I'm excited about</label>
+                        <textarea oninput="saveData()" id="mm_excited" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="Today represents a new opportunity..."></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">2. A positive phrase for myself</label>
+                        <textarea oninput="saveData()" id="mm_phrase" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="I am capable and disciplined..."></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">3. Someone who needs me on my A-Game</label>
+                        <textarea oninput="saveData()" id="mm_someone" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="Name..."></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">4. Stressor & My "Best Self" Response</label>
+                        <textarea oninput="saveData()" id="mm_stress" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="Stressor: ... Response: ..."></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">5. Someone to surprise with appreciation</label>
+                        <textarea oninput="saveData()" id="mm_surprise" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="Who and how?"></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide text-hp-accent">6. One Bold Action To Take</label>
+                        <textarea oninput="saveData()" id="mm_bold" class="w-full bg-slate-950 border border-hp-accent/30 rounded-lg p-3 text-sm focus:border-hp-accent focus:ring-1 focus:ring-hp-accent outline-none transition-all resize-none h-20 placeholder-slate-600" placeholder="The move that scares me a little..."></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PART 2: Habits & Vitals -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Smart Checklist -->
+                <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-list-check text-green-500 text-xl"></i>
+                            <h3 class="text-xl font-bold text-white">Daily Habits</h3>
+                        </div>
+                        <div class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded" id="habit-progress">0/0</div>
+                    </div>
+                    
+                    <div id="habit-list" class="space-y-3">
+                        <!-- Habits Injected by JS -->
+                    </div>
+                </section>
+
+                <!-- Vitals: Hydration & Meds -->
+                <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                            <i class="fa-solid fa-droplet text-blue-500 text-xl"></i>
+                            <h3 class="text-xl font-bold text-white">Optimization</h3>
+                        </div>
+
+                        <!-- Hydration -->
+                        <div class="mb-8">
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="text-sm font-semibold text-slate-300">Hydration (1 Gallon Goal)</label>
+                                <span class="text-xs text-blue-400 font-mono" id="water-count-text">0 / 8</span>
+                            </div>
+                            <div class="flex justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                <!-- Water Icons (Generated by JS) -->
+                                <div id="water-tracker" class="flex w-full justify-between"></div>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2 text-center">8 x 16oz increments (Counts toward daily progress)</p>
+                        </div>
+
+                        <!-- ADHD Meds -->
+                        <div>
+                            <div class="flex justify-between items-end mb-4">
+                                <label class="text-sm font-semibold text-slate-300">Meds Effectiveness</label>
+                                <span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-purple-400" id="meds-val-display">5/10</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="5" id="meds-slider" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer" oninput="updateMedsDisplay(this.value); saveData()">
+                            <div class="flex justify-between text-[10px] text-slate-600 mt-1 uppercase font-bold">
+                                <span>Ineffective</span>
+                                <span>Laser Focus</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- PART 1 (Cont): Scorecard -->
+            <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                    <i class="fa-solid fa-star text-hp-gold text-xl"></i>
+                    <h3 class="text-xl font-bold text-white">Habits Scorecard</h3>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    <!-- Generated via JS -->
+                    <div id="scorecard-container" class="contents"></div>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-800 flex justify-end">
+                     <div class="text-right">
+                        <span class="text-slate-400 text-xs uppercase">Daily Total</span>
+                        <div class="text-2xl font-bold text-white" id="score-total">0/30</div>
+                     </div>
+                </div>
+            </section>
+
+            <!-- PART 1 (Cont): Evening Journal -->
+            <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                    <i class="fa-solid fa-moon text-indigo-400 text-xl"></i>
+                    <h3 class="text-xl font-bold text-white">Evening Journal</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">1. A moment I really appreciated</label>
+                        <textarea oninput="saveData()" id="ev_moment" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none h-20 placeholder-slate-600"></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">2. A situation I handled well</label>
+                        <textarea oninput="saveData()" id="ev_situation" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none h-20 placeholder-slate-600"></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">3. Something I learned today</label>
+                        <textarea oninput="saveData()" id="ev_learn" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none h-20 placeholder-slate-600"></textarea>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold tracking-wide">4. How I could have made today better</label>
+                        <textarea oninput="saveData()" id="ev_better" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none h-20 placeholder-slate-600"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Actions -->
+            <div class="flex justify-center pt-8">
+                <button onclick="archiveAndReset()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-green-900/50 transition-all transform hover:scale-105 flex items-center gap-3">
+                    <i class="fa-solid fa-check-circle text-xl"></i>
+                    Complete Day & Archive
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== TRENDS TAB ==================== -->
+        <div id="content-trends" class="tab-content space-y-6">
+            <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-white">Habit Performance Trends</h3>
+                    <select id="chart-duration" onchange="updateChart()" class="bg-slate-800 text-white text-sm rounded px-2 py-1 border-none outline-none">
+                        <option value="7">Last 7 Days</option>
+                        <option value="14">Last 14 Days</option>
+                        <option value="30">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="habitsChart"></canvas>
+                </div>
+            </section>
+
+            <section class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <h3 class="text-xl font-bold text-white mb-4">Archive History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-slate-400 text-xs uppercase border-b border-slate-800">
+                                <th class="p-3">Date</th>
+                                <th class="p-3">Scorecard</th>
+                                <th class="p-3">Habits</th>
+                                <th class="p-3">Hydration</th>
+                                <th class="p-3">Meds</th>
+                                <th class="p-3 text-right">Journal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="text-sm text-slate-300">
+                            <!-- JS Injection -->
+                        </tbody>
+                    </table>
+                    <div id="empty-history-msg" class="text-center py-8 text-slate-500 italic hidden">No archived days yet.</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== NUTRITION TAB ==================== -->
+        <div id="content-nutrition" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Green -->
+                <div class="bg-emerald-900/20 rounded-2xl border border-emerald-900/50 p-6">
+                    <div class="flex items-center gap-2 mb-4 text-emerald-400">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <h3 class="text-lg font-bold">Preferred (Go!)</h3>
+                    </div>
+                    <ul class="space-y-2 text-sm text-emerald-100/80" id="nutri-green">
+                        <!-- JS Injection -->
+                    </ul>
+                </div>
+
+                <!-- Yellow -->
+                <div class="bg-yellow-900/20 rounded-2xl border border-yellow-900/50 p-6">
+                    <div class="flex items-center gap-2 mb-4 text-yellow-400">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <h3 class="text-lg font-bold">Moderate (Caution)</h3>
+                    </div>
+                    <ul class="space-y-2 text-sm text-yellow-100/80" id="nutri-yellow">
+                        <!-- JS Injection -->
+                    </ul>
+                </div>
+
+                <!-- Red -->
+                <div class="bg-red-900/20 rounded-2xl border border-red-900/50 p-6">
+                    <div class="flex items-center gap-2 mb-4 text-red-400">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                        <h3 class="text-lg font-bold">Avoid (Stop)</h3>
+                    </div>
+                    <ul class="space-y-2 text-sm text-red-100/80" id="nutri-red">
+                        <!-- JS Injection -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center text-slate-600 text-xs py-6">
+        <p>Adam's Habits v1.0 | Data stored locally</p>
+    </footer>
+
+    <!-- JOURNAL VIEW MODAL -->
+    <div id="journal-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-slate-800">
+                <h3 class="text-xl font-bold text-white" id="modal-date">Journal Entry</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-6" id="modal-content">
+                <!-- Content injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // --- 1. CONFIG & DATA ---
+        const HABIT_ITEMS = [
+            "30m Exercise (Weekday focus)",
+            "Bible Reading & Study",
+            "Morning Journaling",
+            "Congregation Meeting Prep",
+            "Evening Journaling",
+            "No Fried Food",
+            "No Alcohol"
+        ];
+
+        const SCORECARD_METRICS = ["Clarity", "Energy", "Necessity", "Productivity", "Influence", "Courage"];
+
+        const NUTRITION_DATA = {
+            green: ["Low-fat Greek yogurt", "Eggs/Egg whites", "Tofu", "Cherries/Berries", "Lemons", "Sourdough bread", "White rice", "Zucchini", "Carrots", "Kale", "Cucumbers", "Olive oil"],
+            yellow: ["High-fiber foods (Oats)", "Brown rice", "Beans/Lentils", "Chicken/Turkey/White Fish (max 6oz)", "Broccoli/Cauliflower"],
+            red: ["All Red Meat", "Organ meats", "Shellfish", "Beer/Liquor", "High-fructose corn syrup", "Dark colas", "Excessive salt", "Fried foods", "Artificial Sweeteners"]
+        };
+
+        let appData = {
+            date: new Date().toLocaleDateString(),
+            journal: {
+                mm_excited: "", mm_phrase: "", mm_someone: "", mm_stress: "", mm_surprise: "", mm_bold: "",
+                ev_moment: "", ev_situation: "", ev_learn: "", ev_better: ""
+            },
+            scores: { Clarity: 3, Energy: 3, Necessity: 3, Productivity: 3, Influence: 3, Courage: 3 },
+            habits: {}, // { "Name": { done: false, na: false } }
+            hydration: 0,
+            meds: 5
+        };
+
+        // Initialize Habits in Data
+        HABIT_ITEMS.forEach(h => {
+            if (!appData.habits[h]) appData.habits[h] = { done: false, na: false };
+        });
+
+        // --- 2. INITIALIZATION ---
+        window.onload = function() {
+            loadData();
+            renderUI();
+            setupChart();
+        };
+
+        function renderUI() {
+            document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            // Text Areas
+            for (const [key, value] of Object.entries(appData.journal)) {
+                const el = document.getElementById(key);
+                if (el) el.value = value;
+            }
+
+            // Meds
+            const medsSlider = document.getElementById('meds-slider');
+            medsSlider.value = appData.meds;
+            updateMedsDisplay(appData.meds);
+
+            renderHabitsList();
+            renderScorecard();
+            renderHydration();
+            renderNutrition();
+            renderHistoryTable();
+            updateGlobalProgress(); // Initial Progress Calc
+        }
+
+        // --- 3. RENDERING FUNCTIONS ---
+
+        function renderNutrition() {
+            const createList = (arr, elId, icon) => {
+                const list = document.getElementById(elId);
+                list.innerHTML = arr.map(item => `
+                    <li class="flex items-center gap-2 food-card">
+                        <span class="w-1.5 h-1.5 rounded-full bg-current opacity-50"></span>
+                        ${item}
+                    </li>
+                `).join('');
+            };
+            createList(NUTRITION_DATA.green, 'nutri-green');
+            createList(NUTRITION_DATA.yellow, 'nutri-yellow');
+            createList(NUTRITION_DATA.red, 'nutri-red');
+        }
+
+        function renderHabitsList() {
+            const list = document.getElementById('habit-list');
+            list.innerHTML = '';
+            
+            let doneCount = 0;
+            let totalActive = 0;
+
+            HABIT_ITEMS.forEach(item => {
+                const habitData = appData.habits[item] || { done: false, na: false };
+                
+                if (!habitData.na) totalActive++;
+                if (habitData.done && !habitData.na) doneCount++;
+
+                const li = document.createElement('div');
+                li.className = `flex items-center justify-between p-3 rounded-lg border transition-all ${habitData.na ? 'bg-slate-900 border-slate-800 opacity-50' : 'bg-slate-950 border-slate-700'}`;
+                
+                li.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleHabit('${item}', 'done')" class="w-6 h-6 rounded border flex items-center justify-center transition-colors ${habitData.done ? 'bg-green-500 border-green-500 text-white' : 'border-slate-600 hover:border-slate-400'}" ${habitData.na ? 'disabled' : ''}>
+                            ${habitData.done ? '<i class="fa-solid fa-check text-xs"></i>' : ''}
+                        </button>
+                        <span class="text-sm ${habitData.na ? 'text-slate-500 line-through' : 'text-slate-200'}">${item}</span>
+                    </div>
+                    <button onclick="toggleHabit('${item}', 'na')" class="text-xs font-bold px-2 py-1 rounded transition-colors ${habitData.na ? 'bg-slate-700 text-white' : 'text-slate-600 hover:text-slate-400 bg-slate-900'}">
+                        N/A
+                    </button>
+                `;
+                list.appendChild(li);
+            });
+
+            const percent = totalActive === 0 ? 0 : Math.round((doneCount / totalActive) * 100);
+            const progressEl = document.getElementById('habit-progress');
+            progressEl.innerText = `${doneCount}/${totalActive} (${percent}%)`;
+            progressEl.className = `text-xs font-mono px-2 py-1 rounded ${percent === 100 ? 'bg-green-900/50 text-green-400' : 'bg-slate-800 text-slate-400'}`;
+            
+            updateGlobalProgress(); // Update Top Bar
+        }
+
+        function updateGlobalProgress() {
+            let activeHabits = 0;
+            let completedHabits = 0;
+            
+            // 1. Calculate Checklist Items
+            HABIT_ITEMS.forEach(item => {
+                const h = appData.habits[item];
+                if (!h.na) {
+                    activeHabits++;
+                    if (h.done) completedHabits++;
+                }
+            });
+
+            // 2. Calculate Water (Treating as 1 "Habit" equivalent)
+            // Weight: 0 to 1 based on hydration/8
+            const waterScore = appData.hydration / 8; 
+            
+            // Total
+            // Numerator: Completed Habits + Water Fraction
+            // Denominator: Active Habits + 1 (The Water Goal)
+            const totalScore = completedHabits + waterScore;
+            const totalPossible = activeHabits + 1;
+            
+            const percent = totalPossible === 0 ? 0 : Math.round((totalScore / totalPossible) * 100);
+            
+            // Update DOM
+            const bar = document.getElementById('global-progress-bar');
+            const text = document.getElementById('global-progress-text');
+            
+            if (bar) bar.style.width = `${percent}%`;
+            if (text) text.innerText = `${percent}%`;
+        }
+
+        function renderScorecard() {
+            const container = document.getElementById('scorecard-container');
+            container.innerHTML = '';
+            let total = 0;
+
+            SCORECARD_METRICS.forEach(metric => {
+                const val = appData.scores[metric] || 3;
+                total += parseInt(val);
+                
+                const div = document.createElement('div');
+                div.className = "space-y-2";
+                div.innerHTML = `
+                    <div class="flex justify-between text-sm">
+                        <label class="font-semibold text-slate-300">${metric}</label>
+                        <span class="text-hp-accent font-bold">${val}</span>
+                    </div>
+                    <input type="range" min="1" max="5" value="${val}" 
+                        class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                        oninput="updateScore('${metric}', this.value)">
+                    <div class="flex justify-between text-[10px] text-slate-600 px-1">
+                        <span>1</span><span>5</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('score-total').innerText = `${total}/30`;
+        }
+
+        function renderHydration() {
+            const container = document.getElementById('water-tracker');
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= 8; i++) {
+                const filled = i <= appData.hydration;
+                const btn = document.createElement('button');
+                btn.onclick = () => setHydration(i === appData.hydration ? i - 1 : i); // Toggle off if clicking current max
+                btn.className = `water-drop text-2xl ${filled ? 'filled' : 'empty'}`;
+                btn.innerHTML = '<i class="fa-solid fa-glass-water"></i>';
+                container.appendChild(btn);
+            }
+            document.getElementById('water-count-text').innerText = `${appData.hydration} / 8`;
+            updateGlobalProgress(); // Update Top Bar
+        }
+
+        function renderHistoryTable() {
+            const history = JSON.parse(localStorage.getItem('adamsHabitsHistory')) || [];
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            if (history.length === 0) {
+                document.getElementById('empty-history-msg').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('empty-history-msg').classList.add('hidden');
+
+            // Show newest first
+            history.slice().reverse().forEach((entry, i) => {
+                // Calc stats
+                let scoreTotal = Object.values(entry.scores).reduce((a,b) => parseInt(a)+parseInt(b), 0);
+                
+                let activeHabits = 0, doneHabits = 0;
+                Object.values(entry.habits).forEach(h => {
+                    if(!h.na) {
+                        activeHabits++;
+                        if(h.done) doneHabits++;
+                    }
+                });
+                let habitStr = `${doneHabits}/${activeHabits}`;
+
+                // Calculate original index because slice().reverse() messes up the index
+                const originalIndex = history.length - 1 - i;
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-800 hover:bg-slate-800/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-3 text-slate-200">${entry.date}</td>
+                    <td class="p-3 text-hp-gold font-bold">${scoreTotal}</td>
+                    <td class="p-3 text-green-400">${habitStr}</td>
+                    <td class="p-3 text-blue-400">${entry.hydration}/8</td>
+                    <td class="p-3 text-purple-400">${entry.meds}/10</td>
+                    <td class="p-3 text-right">
+                        <button onclick="viewJournal(${originalIndex})" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded transition-colors border border-slate-600">
+                            View
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 4. DATA HANDLING ---
+
+        function saveData() {
+            // Read inputs
+            appData.journal.mm_excited = document.getElementById('mm_excited').value;
+            appData.journal.mm_phrase = document.getElementById('mm_phrase').value;
+            appData.journal.mm_someone = document.getElementById('mm_someone').value;
+            appData.journal.mm_stress = document.getElementById('mm_stress').value;
+            appData.journal.mm_surprise = document.getElementById('mm_surprise').value;
+            appData.journal.mm_bold = document.getElementById('mm_bold').value;
+            
+            appData.journal.ev_moment = document.getElementById('ev_moment').value;
+            appData.journal.ev_situation = document.getElementById('ev_situation').value;
+            appData.journal.ev_learn = document.getElementById('ev_learn').value;
+            appData.journal.ev_better = document.getElementById('ev_better').value;
+
+            localStorage.setItem('adamsHabitsData', JSON.stringify(appData));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('adamsHabitsData');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Merge to ensure structure integrity if code updates
+                appData = { ...appData, ...parsed };
+                // Ensure habits object is populated
+                 HABIT_ITEMS.forEach(h => {
+                    if (!appData.habits[h]) appData.habits[h] = { done: false, na: false };
+                });
+            }
+        }
+
+        // --- 5. INTERACTION LOGIC ---
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(`content-${tabName}`).classList.add('active');
+            
+            const btns = ['journal', 'trends', 'nutrition'];
+            btns.forEach(b => {
+                const btn = document.getElementById(`tab-${b}`);
+                if (b === tabName) {
+                    btn.classList.remove('text-slate-400', 'bg-transparent');
+                    btn.classList.add('bg-slate-700', 'text-white', 'shadow');
+                } else {
+                    btn.classList.add('text-slate-400', 'bg-transparent');
+                    btn.classList.remove('bg-slate-700', 'text-white', 'shadow');
+                }
+            });
+            
+            // Toggle Sticky Progress Bar Visibility
+            const progressHeader = document.getElementById('sticky-progress-container');
+            if (tabName === 'journal') {
+                progressHeader.classList.remove('hidden');
+            } else {
+                progressHeader.classList.add('hidden');
+            }
+            
+            if (tabName === 'trends') updateChart();
+        }
+
+        function toggleHabit(name, field) {
+            if (field === 'na') {
+                appData.habits[name].na = !appData.habits[name].na;
+                // If N/A is true, uncheck Done
+                if (appData.habits[name].na) appData.habits[name].done = false;
+            } else {
+                appData.habits[name].done = !appData.habits[name].done;
+            }
+            saveData();
+            renderHabitsList();
+        }
+
+        function updateScore(metric, val) {
+            appData.scores[metric] = val;
+            saveData();
+            renderScorecard(); // Re-renders to update total
+        }
+
+        function setHydration(val) {
+            appData.hydration = val;
+            saveData();
+            renderHydration();
+        }
+
+        function updateMedsDisplay(val) {
+            document.getElementById('meds-val-display').innerText = `${val}/10`;
+            appData.meds = val;
+        }
+
+        function archiveAndReset() {
+            if (!confirm("Are you sure you want to finish today? This will save to history and clear the form.")) return;
+
+            // 1. Get History
+            const history = JSON.parse(localStorage.getItem('adamsHabitsHistory')) || [];
+            
+            // 2. Prepare Snapshot (Current Data)
+            // Ensure date is static string for history
+            const snapshot = { ...appData, date: new Date().toLocaleDateString() };
+            history.push(snapshot);
+            
+            // 3. Save History
+            localStorage.setItem('adamsHabitsHistory', JSON.stringify(history));
+
+            // 4. Reset Data
+            appData = {
+                date: new Date().toLocaleDateString(),
+                journal: {
+                    mm_excited: "", mm_phrase: "", mm_someone: "", mm_stress: "", mm_surprise: "", mm_bold: "",
+                    ev_moment: "", ev_situation: "", ev_learn: "", ev_better: ""
+                },
+                scores: { Clarity: 3, Energy: 3, Necessity: 3, Productivity: 3, Influence: 3, Courage: 3 },
+                habits: {},
+                hydration: 0,
+                meds: 5
+            };
+            HABIT_ITEMS.forEach(h => appData.habits[h] = { done: false, na: false });
+            
+            // 5. DIRECT SAVE to storage (bypassing DOM read) so fields are actually cleared
+            localStorage.setItem('adamsHabitsData', JSON.stringify(appData));
+            
+            // 6. UI Updates
+            renderUI();
+            alert("Day Archived Successfully!");
+            switchTab('trends');
+        }
+        
+        // --- 6. MODAL LOGIC ---
+        
+        function viewJournal(index) {
+            const history = JSON.parse(localStorage.getItem('adamsHabitsHistory')) || [];
+            const entry = history[index];
+            if (!entry) return;
+
+            document.getElementById('modal-date').innerText = entry.date;
+            const content = document.getElementById('modal-content');
+            
+            const renderField = (label, text) => {
+                if (!text || text.trim() === '') return `<div class="bg-slate-950 p-4 rounded-xl border border-slate-800 opacity-50"><h4 class="text-xs font-bold text-slate-500 uppercase mb-1">${label}</h4><p class="text-slate-500 text-sm italic">No entry</p></div>`;
+                return `
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">${label}</h4>
+                        <p class="text-slate-200 text-sm whitespace-pre-wrap">${text}</p>
+                    </div>
+                `;
+            };
+
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-yellow-500 border-b border-slate-800 pb-2">Morning Mindset</h3>
+                    ${renderField('Excited About', entry.journal.mm_excited)}
+                    ${renderField('Positive Phrase', entry.journal.mm_phrase)}
+                    ${renderField('Needs Me', entry.journal.mm_someone)}
+                    ${renderField('Stressor & Response', entry.journal.mm_stress)}
+                    ${renderField('Surprise Appreciation', entry.journal.mm_surprise)}
+                    ${renderField('Bold Action', entry.journal.mm_bold)}
+                    
+                    <h3 class="text-lg font-bold text-indigo-400 border-b border-slate-800 pb-2 pt-4">Evening Journal</h3>
+                    ${renderField('Appreciated Moment', entry.journal.ev_moment)}
+                    ${renderField('Handled Well', entry.journal.ev_situation)}
+                    ${renderField('Learned', entry.journal.ev_learn)}
+                    ${renderField('Better Tomorrow', entry.journal.ev_better)}
+                </div>
+            `;
+
+            document.getElementById('journal-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('journal-modal').classList.add('hidden');
+        }
+
+        // --- 7. CHARTS ---
+        let chartInstance = null;
+
+        function setupChart() {
+            // Init with empty, updated in updateChart
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('habitsChart').getContext('2d');
+            const history = JSON.parse(localStorage.getItem('adamsHabitsHistory')) || [];
+            const duration = parseInt(document.getElementById('chart-duration').value);
+
+            // Filter history by days (take last N)
+            const slicedHistory = history.slice(-duration);
+
+            const labels = slicedHistory.map(entry => {
+                // Short date: "Jan 1"
+                const d = new Date(entry.date);
+                return isNaN(d) ? entry.date : `${d.getMonth()+1}/${d.getDate()}`;
+            });
+
+            // Calculate Average Score per day
+            const dataPoints = slicedHistory.map(entry => {
+                const total = Object.values(entry.scores).reduce((a,b) => parseInt(a)+parseInt(b), 0);
+                return total;
+            });
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Habit Score (Max 30)',
+                        data: dataPoints,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#0f172a',
+                        pointBorderColor: '#3b82f6',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 30,
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } }
+                    }
+                }
+            });
+            
+            renderHistoryTable(); // Update table while we are here
+        }
+
+    </script>
+</body>
+</html>
